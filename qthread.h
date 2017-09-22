@@ -39,4 +39,18 @@ private:
     QString  m_szPing;
 };
 
+class CpuThrd : public QThread
+{
+    Q_OBJECT
+public:
+    CpuThrd();
+    ~CpuThrd();
+protected:
+    void run();
+signals:
+    void NoticeMsg(const QString &str);
+private:
+    bool m_stop;
+};
+
 #endif // SHQTHREAD_H

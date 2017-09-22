@@ -12,6 +12,7 @@
 #include "interface.h"
 #include "ryanConfig.h"
 #include "loadingframe.h"
+#include <sys/syscall.h>
 
 extern myHttp *g_pMyHttp;
 
@@ -51,7 +52,7 @@ extern int  g_nMultiStudentAP;
 int DameonInit(void);
 void MainExit(int sig);
 void Regist();
-
+extern volatile bool  g_bgetserTime;
 
 
 #define PIPE_SIGNAL_UP    "1"
@@ -59,6 +60,7 @@ void Regist();
 
 
 #define CONFIGNAME  "/usr/local/shencloud/Terminal.con"
+#define CONFIGDEMON  "/usr/local/shencloud/Demon.con"
 
 #define VISION_VISON     "                        \n\t\
   _______________________________________________ \n\t\

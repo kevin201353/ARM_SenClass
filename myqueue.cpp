@@ -16,8 +16,14 @@ void MyQueue::GetQueMsg(QueMsg *queMsg)
      QMutexLocker locker(&m_mutex);
      if (queMsg != NULL)
      {
-        QueMsg msg = m_queue.dequeue();
-        strcpy(queMsg->Data, msg.Data);
+        if (!m_queue.isEmpty())
+        {
+            QueMsg msg = m_queue.dequeue();
+            strcpy(queMsg->Data, msg.Data);
+        }else
+        {
+            memset(queMsg->Data, 0, sizeof(queMsg->Data));
+        }
      }
 }
 

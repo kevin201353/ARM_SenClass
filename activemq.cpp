@@ -5,7 +5,6 @@
 #include "myqueue.h"
 #include "mqmsgprocess.h"
 
-extern volatile bool g_resetamq;
 extern LoginWidget * g_loginWnd;
 MyQueue  g_MsgQueue;
 
@@ -40,7 +39,7 @@ void ActiveMQProduce::initialize()
 {
     try {
         // Create a ConnectionFactory
-        auto_ptr<ActiveMQConnectionFactory> connectionFactory(new ActiveMQConnectionFactory( brokerURI ) );
+        auto_ptr<ActiveMQConnectionFactory> connectionFactory(new ActiveMQConnectionFactory(brokerURI));
 
         // Create a Connection
         try{
@@ -196,7 +195,7 @@ void ActiveMQConsumer::runConsumer()
 {
     try {
         // Create a ConnectionFactory
-        ActiveMQConnectionFactory* connectionFactory = new ActiveMQConnectionFactory( brokerURI );
+        ActiveMQConnectionFactory* connectionFactory = new ActiveMQConnectionFactory(brokerURI);
 
         if (NULL == connectionFactory)
             return;
@@ -264,6 +263,7 @@ void ActiveMQConsumer::onMessage( const Message* message )
         {
             text = "NOT A BYTESMESSAGE!";
         }
+
         if( clientAck )
         {
             char MessageBuf[1024];
@@ -279,9 +279,11 @@ void ActiveMQConsumer::onMessage( const Message* message )
            // message->acknowledge();
         }
         g_pLog->WriteLog(0,"Message #%d Received: %s\n", count, text.c_str());
-        //QueMsg msg;
-        //strcpy(msg.Data, text.c_str());
-        //g_MsgQueue.AddQueMsg(msg);
+        /*
+        QueMsg msg;
+        strcpy(msg.Data, text.c_str());
+        g_MsgQueue.AddQueMsg(msg);
+        */
         g_myBuffer.add((char *)text.c_str());
 		
         /*
@@ -307,9 +309,6 @@ void ActiveMQConsumer::onException( const CMSException& ex AMQCPP_UNUSED )
 {
     //printf("CMS Exception occurred.  Shutting down client.\n");
     g_pLog->WriteLog(0,"zhaosenhua amq received message onException @@@@ , error: %s\n", ex.getMessage().c_str());
-    //to here, network inter
-    //g_resetamq = true;
-    //exit(1);
 }
 
 void ActiveMQConsumer::transportInterrupted()
@@ -396,3 +395,70 @@ void ActiveMQConsumer::start( const std::string& brokerURI,const std::string& de
     this->destURI = destURI;
     this->clientAck = clientAck;
 }
+
+/********************************************************
+ *
+ * *********************************************************/
+static pthread_t g_mqpid = NULL;
+MyMqConsumer::MyMqConsumer()
+{
+    m_stop = false;
+    m_pconsumer = NULL;
+    m_pconnect = NULL;
+    m_psession = NULL;
+    m_pdest = NULL;
+}
+
+MyMqConsumer::~MyMqConsumer()
+{
+    m_stop = true;
+    m_pconnect->close();
+    m_pconsumer = NULL;
+    m_pconnect = NULL;
+    m_psession = NULL;
+    m_pdest = NULL;
+}
+
+void MyMqConsumer::init(const std::string& brokerURI, const std::string& destURI)
+{
+    ActiveMQConnectionFactory factory;
+    g_pLog->WriteLog(0,"ThrdMqMessage, init brokerURI:%s, destURI:%s.\n", brokerURI.c_str(), destURI.c_str());
+    factory.setBrokerURI(brokerURI);
+    m_pconnect = factory.createConnection();
+    m_psession = m_pconnect->createSession(Session::AUTO_ACKNOWLEDGE);
+    m_pdest = m_psession->createQueue(destURI);
+    m_pconsumer = m_psession->createConsumer(m_pdest);
+    m_pconnect->start();
+}
+
+void *ThrdMqMessage(void *param)
+{
+    MyMqConsumer* pMq = (MyMqConsumer*)param;
+    if (NULL == pMq)
+        return NULL;
+    while(!pMq->m_stop)
+    {
+        std::auto_ptr<Message> message(pMq->m_pconsumer->receive(1000*10));
+        const BytesMessage* bytesMessage = dynamic_cast< const BytesMessage* >(message.get());
+        if( bytesMessage != NULL )
+        {
+            string text;
+            text.assign((char *)(bytesMessage->getBodyBytes()),(bytesMessage->getBodyLength()));
+            g_pLog->WriteLog(0,"message len: %d, Received: %s\n", bytesMessage->getBodyLength(), text.c_str());
+            g_myBuffer.add((char *)text.c_str());
+        }
+        usleep(1000);
+    }
+    pthread_detach(pthread_self());
+    return NULL;
+}
+
+void MyMqConsumer::start()
+{
+    if(pthread_create(&g_mqpid,NULL,ThrdMqMessage,this))
+    {
+        g_pLog->WriteLog(0,"MyMqConsumer::start(), pthread_create failed. \n");
+    }
+}
+
+

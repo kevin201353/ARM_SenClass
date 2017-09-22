@@ -87,4 +87,20 @@ private:
     std::string brokerURI;
     std::string destURI;
 };
+
+class MyMqConsumer
+{
+public:
+    MyMqConsumer();
+    ~MyMqConsumer();
+public:
+    void init(const std::string& brokerURI, const std::string& destURI);
+    void start();
+public:
+    MessageConsumer* m_pconsumer;
+    Connection* m_pconnect;
+    Session* m_psession;
+    Destination* m_pdest;
+    bool  m_stop;
+};
 #endif // ACTIVEMQ_H

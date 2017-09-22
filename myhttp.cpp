@@ -70,7 +70,7 @@ void myHttp::GetData(char *Buf)
         return ;
     m_Qtimer.start();
     pthread_mutex_lock(&m_Locak);
-    m_peventLoop->exec();
+    m_peventLoop->exec(QEventLoop::ExcludeSocketNotifiers);
     pthread_mutex_unlock(&m_Locak);
     if(m_Qtimer.isActive())
     {

@@ -6,7 +6,8 @@
 #include "mydialog.h"
 #include "global.h"
 
-#define SH_PASS_CONFIG   "@1en0v0"
+//"@1en0v0"
+#define SH_PASS_CONFIG   ""
 
 #define DIALOGPNG1       "/usr/local/shencloud/image1/msgboxbg.png"
 

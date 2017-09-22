@@ -9,6 +9,7 @@
 #include "aboutui.h"
 #include "global.h"
 #include <QLabel>
+#include "include.h"
 
 #define DESKTOPMAP3   "/usr/local/shencloud/image1/50_22.png"
 #define GIFFILE2  "/usr/local/shencloud/image1/waitting.gif"
@@ -18,6 +19,7 @@
 
 float g_scr_old_width = 1920.0;
 float g_scr_old_height = 1080.0;
+waitstu2  *m_waitstu = NULL;
 int my_resize(QWidget* widget, float factorX, float factorY)
 {
     int width = widget->width();
@@ -44,7 +46,7 @@ waitstu2::waitstu2(QWidget *parent) :
     ui->setupUi(this);
     this->setAutoFillBackground(true);
     this->setWindowModality(Qt::ApplicationModal);
-    //this->setWindowFlags(Qt::WindowStaysOnTopHint);
+ //   this->setWindowFlags(Qt::WindowStaysOnTopHint);
  //   this->setWindowFlags(this->windowFlags()& ~Qt::WindowMinMaxButtonsHint);
 //    QDesktopWidget *desktopWidget = QApplication::desktop();
 //    QRect deskRect = desktopWidget->availableGeometry();
@@ -82,7 +84,11 @@ waitstu2::waitstu2(QWidget *parent) :
     widget_resize();
     connect(ui->btn_Setting,SIGNAL(clicked(bool)),this,SLOT(On_Setting()));
     connect(ui->btn_shutdown,SIGNAL(clicked(bool)),this,SLOT(On_Shutdown()));
-    this->show();
+    CpuThrd *cpuThread = new CpuThrd();
+    connect(cpuThread, SIGNAL(NoticeMsg(const QString &)),this,SLOT(On_ShowCpu(const QString &)));
+    connect(cpuThread, &CpuThrd::finished, cpuThread, &QObject::deleteLater);
+    m_waitstu = this;
+    cpuThread->start();
 }
 
 waitstu2::~waitstu2()
@@ -98,14 +104,11 @@ waitstu2::~waitstu2()
 void waitstu2::waitstushow()
 {
     this->show();
-    //this->showFullScreen();
-    //ui->image_label->showFullScreen();
 }
 
 void waitstu2::waitstuhide()
 {
     this->hide();
-    //ui->image_label->hide();
 }
 
 void waitstu2::paintEvent(QPaintEvent *event)
@@ -190,8 +193,24 @@ void waitstu2::widget_resize()
     labelip->resize(200, 30);
     labelip->setFont(font);
     my_resize(labelip, factor_x, factor_y);
-    labelip->move(30 * factor_x, (scr_height - labelip->height()) * factor_y);
+    labelip->move(30, (scr_height - labelip->height() * 2));
     QString strsoft(m_strIP);
     labelip->setText(strsoft);
     labelip->show();
+
+    //cpu
+    labelcpu = new QLabel(this);
+    labelcpu->resize(200, 30);
+    labelcpu->setFont(font);
+    my_resize(labelcpu, factor_x, factor_y);
+    labelcpu->move(labelip->width() + 10, (scr_height - labelcpu->height() * 2));
+    labelcpu->setText("");
+    labelcpu->show();
+}
+
+void waitstu2::On_ShowCpu(const QString &str)
+{
+    QString tmp = "cpu(%):";
+    tmp += str;
+    labelcpu->setText(tmp);
 }

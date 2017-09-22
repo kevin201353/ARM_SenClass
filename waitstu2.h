@@ -5,6 +5,8 @@
 #include <QMovie>
 #include <QTimer>
 #include "global.h"
+#include "qthread.h"
+#include <QLabel>
 
 namespace Ui {
 class waitstu2;
@@ -35,12 +37,14 @@ signals:
 private slots:
     void On_Setting();
     void On_Shutdown();
+    void On_ShowCpu(const QString &str);
 private:
     Ui::waitstu2 *ui;
     QMovie  *m_pMovie;
     int     m_width;
     int     m_height;
     char    m_strIP[MAX_IP_SIZE];
+    QLabel *labelcpu;
 };
 
 #endif // WAITSTU2_H

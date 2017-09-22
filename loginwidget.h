@@ -83,14 +83,10 @@ public:
     //Group   *m_pGroupWigdet;
     SetForm     *m_pSetForm;
     MyDialog    *m_pMyDialog;
-    //WaitstuDialog  *m_waitstuDialog;
-    waitstu2    *m_waitstu;
     void Thread();
     void SetChecked();
     void createPipe();
-    void initConfig();
     void SetEnable(bool flag);
-    void rebootAmqThrd();
     void widget_resize();
     int width() const {
         return m_width;
@@ -139,7 +135,6 @@ private:
     ClassMould *m_pClassName3;
     SetRoomSeatDialog *m_pSetRoomSeat;
     bool m_bExitThread;
-    LoadingFrame * g_Loadingwnd;
     qthread    *m_pqthread;
     PasswordUI *m_passui;
     int     m_width;

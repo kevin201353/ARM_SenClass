@@ -27,6 +27,7 @@
 #define MAX_IP_SIZE            20
 
 #define FIFO_PIPE   "/usr/local/shencloud/student_fifo"
+#define SPICY_LOG_PATH  "/usr/local/shencloud/log/Spicy.log"
 
 #define PIPE_SPICYLOG(x) ({ FILE *fp = fopen("/usr/local/shencloud/student_spicy", "a+"); \
     if (fp != NULL){ \
@@ -56,9 +57,6 @@ extern void create_msg_queue();
 extern void msg_send(char* dataTmp);
 extern void msg_queue_del();
 extern void msg_recv(char* dataT);
-extern void amq_monitor();
-extern bool    g_exitMonitoramq;
-extern pthread_t g_monitoramq;
 extern int ping_net(char *ip);
 #ifdef ARM
 extern long long  __GetTime();

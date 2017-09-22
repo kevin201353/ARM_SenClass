@@ -1,7 +1,10 @@
 #include "qthread.h"
 #include <QDebug>
+#include "include.h"
+#include "sysInfo.h"
 
-extern bool g_bSetupAmq;
+extern volatile bool g_bSetupAmq;
+extern int ping_net(char *ip);
 qthread::qthread()
 {
     m_stop = false;
@@ -30,7 +33,7 @@ void qthread::run()
         {
             emit NoticeHide();
         }
-        sleep(5);
+        usleep(500);
     }
 }
 
@@ -77,6 +80,43 @@ void qthreadPing::run()
             nCount++;
         }
         pclose(pp);
+    }
+}
+
+/***************************************************************************************/
+CpuThrd::CpuThrd()
+{
+    m_stop = false;
+}
+
+CpuThrd::~CpuThrd()
+{
+    m_stop = true;
+}
+
+void CpuThrd::run()
+{
+    QString strcpu;
+    char szcmd[100] = {0};
+    sprintf(szcmd, "top -b -n 1 -p %u 2>&1 | awk -v pid=%u '{if($1==%u)print $9}'", (unsigned int)getpid(), (unsigned int)getpid(), (unsigned int)getpid());
+    while(!m_stop)
+    {
+        FILE *pp = popen(szcmd, "r");
+        if (pp)
+        {
+            char tmp[512] = {0};
+            while (fgets(tmp, sizeof(tmp), pp) != NULL)
+            {
+                if (tmp[strlen(tmp) -1] == '\n')
+                {
+                    tmp[strlen(tmp) - 1] = '\0';
+                }
+                strcpu = QString::fromStdString(tmp);
+                emit NoticeMsg(strcpu);
+            }
+            pclose(pp);
+        }
+        sleep(1);
     }
 }
 

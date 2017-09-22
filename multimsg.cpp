@@ -56,6 +56,9 @@ MultiMsg::MultiMsg()
     g_pLog->WriteLog(0, szMsg);
     if (nResult)
     {
+        memset(szMsg, 0, sizeof(szMsg));
+        sprintf(szMsg, "zhaosenhua MultiMsg, joinMulticastGroup addr : %s.", szAddr);
+        g_pLog->WriteLog(0, szMsg);
         nResult = udpSocket->joinMulticastGroup(groupAddress);
         sprintf(szMsg, "zhaosenhua MultiMsg, udp joinMulticastGroup: %d.", nResult);
         g_pLog->WriteLog(0, szMsg);
@@ -70,8 +73,9 @@ MultiMsg::MultiMsg()
 
 void MultiMsg::uinit()
 {
+    g_pLog->WriteLog(0, "MultiMsg::uinit() !!!");
     udpSocket->disconnected();
-    udpSocket->leaveMulticastGroup(groupAddress);
+    //udpSocket->leaveMulticastGroup(groupAddress);
 }
 
 void MultiMsg::startSending()
@@ -86,6 +90,7 @@ void MultiMsg::sendDatagram()
 
 void MultiMsg::processPendingDatagrams()
 {
+    //g_pLog->WriteLog(0, "thread processPendingDatagrams, pid: %u, tid: %u .", (unsigned int)getpid(), (unsigned int)syscall(SYS_gettid));
     char szMsg[1024] = {0};
     while(udpSocket->hasPendingDatagrams())
     {

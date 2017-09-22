@@ -21,6 +21,8 @@ public:
     void _abotThread();
     void strart_spicyThrd();
     void _spicyProcess();
+    void startMulticast();
+    void saveState();
 public:
     char m_strVmID[50];
     char m_strMac[50];

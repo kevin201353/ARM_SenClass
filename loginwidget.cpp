@@ -2,16 +2,17 @@
 #include "myui_loginwidget.h"
 #include "include.h"
 #include "global.h"
-#include "testnet.h"
+//#include "testnet.h"
 #include <QDate>
 #include <QDesktopWidget>
 #include "qthread.h"
 //#include "buildtime.h"
 #include "type.h"
+#include "netlink.h"
+#include <semaphore.h>
 
+extern char buildtime[32];
 extern NetConfig   *g_pNetConfig;
-extern void amq_monitor();
-extern volatile bool g_resetamq;
 extern bool g_bshowwaitstu;
 extern volatile bool g_bSetupAmq;
 extern int g_msgid;
@@ -22,21 +23,18 @@ void *InitThread(void *param);
 static pthread_t g_xtid = 0;
 static char g_szCmd[1024] = {0};
 static bool g_ExitMsThread = false;
-extern char buildtime[32];
 bool   g_processThread = false;
 MqMsgProcess  g_mqMsgProcess;
-static pthread_t g_heartid = NULL;
+static pthread_t g_amqpid = NULL;
+static pthread_mutex_t g_hreadMutex;
 
-pthread_mutex_t g_hreadMutex;
 pthread_mutex_t g_freestudyMutex;
 
 bool  g_bExit_freeStuy_flag = false;
 extern char g_szRetVm[1024];
 extern bool  g_spicyProcessExit;
 char   g_szLocalIP[MAX_IP_SIZE] = {0};
-
-
-#define SPICY_LOG_PATH  "/usr/local/shencloud/log/spicy.log"
+extern waitstu2  *m_waitstu;
 
 static void *thrd_exec(void *param)
 {
@@ -50,50 +48,55 @@ extern unsigned long long g_interval_time;
 #else
 extern long g_interval_time;
 #endif
-extern int detect_process(char* szProcess);
+
 static void *MonitorSpicy(void *param)
 {
     while(true)
     {
         if (g_ExitMsThread)
             break;
-		while(true)
-	    {
-	        if (g_bSetupAmq)
-	        {
-	           int ret = ping_net(g_strServerIP);
-	           if (ret == 1)
-	           {
-	               break;
-	           }
-	        }
-            //qDebug() << "MonitorSpicy wait net running.\n";
-	        sleep(3);
-	    }
-		myHttp http;
-		http.SetUrlIP(g_strServerIP);
-		char data[100] = {0};
-		char json[100] = {0};
-		bool bjson = false;
-		sprintf(data,"%s","/service/aps/timestamp");
-		http.Get(data);
-		http.GetData(json);
-		g_pLog->WriteLog(0,"student client get timestamp http return data:%s", json);
-		g_pJson->Parse(json);
-		g_pJson->ReadJson(&bjson, "success");
-		if (bjson)
-		{
-			memset(data, 0, 100);
-			g_pJson->ReadJson_v(data, "data", "systemTime");
-			g_pLog->WriteLog(0,"student client recv server time:%s", data);
-			g_interval_time = atoll(data);
-			g_pLog->WriteLog(0,"student client recv server time atoll = :%lld", g_interval_time);
-			//g_interval_time = (unsigned long long)abs(g_interval_time - __GetTime());
-			g_interval_time = g_interval_time - __GetTime();
-			g_pLog->WriteLog(0,"student client recv server time g_interval_time = :%lld,  _GetTime = %lld", g_interval_time, __GetTime());
-		}
-         sleep(15);
+
+//		while(true)
+//	    {
+//            if (g_bSetupAmq)
+//	        {
+//	           int ret = ping_net(g_strServerIP);
+//	           if (ret == 1)
+//	           {
+//	               break;
+//	           }
+//            }
+//            //qDebug() << "MonitorSpicy wait net running.\n";
+//            sleep(3);
+//        }
+        if (g_bgetserTime)
+        {
+            myHttp http;
+            http.SetUrlIP(g_strServerIP);
+            char data[100] = {0};
+            char json[100] = {0};
+            bool bjson = false;
+            sprintf(data,"%s","/service/aps/timestamp");
+            http.Get(data);
+            http.GetData(json);
+            g_pLog->WriteLog(0,"student client get timestamp http return data:%s", json);
+            g_pJson->Parse(json);
+            g_pJson->ReadJson(&bjson, "success");
+            if (bjson)
+            {
+                memset(data, 0, 100);
+                g_pJson->ReadJson_v(data, "data", "systemTime");
+                g_pLog->WriteLog(0,"student client recv server time:%s", data);
+                g_interval_time = atoll(data);
+                g_pLog->WriteLog(0,"student client recv server time atoll = :%lld", g_interval_time);
+                //g_interval_time = (unsigned long long)abs(g_interval_time - __GetTime());
+                g_interval_time = g_interval_time - __GetTime();
+                g_pLog->WriteLog(0,"student client recv server time g_interval_time = :%lld,  _GetTime = %lld", g_interval_time, __GetTime());
+            }
+        }
+        sleep(15);
     }
+    pthread_detach(pthread_self());
     return NULL;
 }
 
@@ -103,83 +106,19 @@ static void *MonitorSpicy(void *param)
 #else
     long st_heart_time = 0;
 #endif
-
-
-
 #define  HEART_MAX_COUNT  2
 
 int    g_check_heart_flag = 0;
-
-static void *   HeartThread(void *param)
-{
-//    st_heart_time = __GetTime();
-//#ifdef ARM
-//    long heart_time = 0;
-//#else
-//    long long heart_time = 0;
-//#endif
-//    char szTmp[512] = {0};
-//    bool bexit = false;
-//	while(1)
-//	{
-//		pthread_mutex_lock(&g_hreadMutex);
-//        heart_time  = __GetTime();
-//        if ( heart_time - st_heart_time > HEART_MAX_TIME)
-//		{
-//			//no recv heart msg , reboot client
-//			pthread_mutex_unlock(&g_hreadMutex);
-//            memset(szTmp, 0, sizeof(szTmp));
-//            sprintf(szTmp, "check heartbeat, reboot ClassCloudRoom_Student hearttime: %ld, st_heart_time :%ld, delay :%ld", heart_time, st_heart_time, heart_time - st_heart_time);
-//            qDebug() << szTmp;
-//            g_pLog->WriteLog(0, szTmp);
-//            bexit = true;
-//			break;
-//		}
-//        memset(szTmp, 0, sizeof(szTmp));
-//        sprintf(szTmp, "check heartbeat, __GetTime() :%ld,  st_heart_time :%ld,  delay :%ld", heart_time, st_heart_time, heart_time - st_heart_time);
-//        qDebug() <<szTmp;
-//        g_pLog->WriteLog(0, szTmp);
-//		pthread_mutex_unlock(&g_hreadMutex);
-//        sleep(2);
-//	}
-	char szTmp[512] = {0};
-	while(1)
-	{
-        if (g_bSetupAmq)
-        {
-           int ret = ping_net(g_strServerIP);
-           if (ret == 1)
-           {
-               if (g_check_heart_flag > HEART_MAX_COUNT)
-               {
-                   //memset(szTmp, 0, sizeof(szTmp));
-                   //sprintf(szTmp, "XXXXXXXXXXXX HeartThread, reboot MsgProcess thread.");
-                   //g_pLog->WriteLog(0, szTmp);
-                   //qDebug() << szTmp;
-                   g_mqMsgProcess._abotThread();
-                   g_mqMsgProcess.start();
-//                   if (NULL != g_loginWnd)
-//                   {
-//                       g_loginWnd->rebootAmqThrd();
-//                   }
-                   g_check_heart_flag = 0;
-               }
-               //qDebug() << "check heart flag :" << g_check_heart_flag;
-               g_check_heart_flag++;
-           }
-        }
-		sleep(20);
-	}
-}
-
 LoginWidget::LoginWidget(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::LoginWidget)
 {
     ui->setupUi(this);
     this->setAutoFillBackground(true);
+    this->setWindowFlags(Qt::Window);
     g_loginWnd = NULL;
     g_loginWnd = this;
+#if 0
     int scr_width = QApplication::desktop()->width();
     int scr_height = QApplication::desktop()->height();
     float factor_x = (float)scr_width/g_scr_old_width;
@@ -188,9 +127,8 @@ LoginWidget::LoginWidget(QWidget *parent) :
     this->m_height = scr_height;
     this->resize(width(), height());
     my_resize(this, factor_x, factor_y);
-    //this->move(-1920, -1080);
+#endif
     InitMyMutex();
-    activemq::library::ActiveMQCPP::initializeLibrary();
     m_pLogoQLable = ui->Logolabel;
     m_pLogoQLable->setAlignment(Qt::AlignCenter);
     //m_pLogoQLable->setPixmap(QPixmap(LOGOPNG));
@@ -262,7 +200,6 @@ LoginWidget::LoginWidget(QWidget *parent) :
     m_pClassNameConfig->AddLabel(m_pClassName2);
     m_pClassNameConfig->AddLabel(m_pClassName3);
     m_pClassName1->SetCheckedFlag(true);
-    this->hide();
 
     //m_pEnterPushButton->setMinimumSize(284,66);
    //m_pEnterPushButton->setEnabled(false);
@@ -290,7 +227,6 @@ LoginWidget::LoginWidget(QWidget *parent) :
     connect(m_pClassName3,SIGNAL(LabelDoubleclicked()),this,SLOT(on_LableDoubleClicked()));
     m_passui = new PasswordUI();
     connect(m_passui, SIGNAL(ShowPassUI()),this,SLOT(on_ShowPassUI()));
-    m_waitstu = new waitstu2();
     connect(m_waitstu, SIGNAL(wait_showPassUI()), this, SLOT(on_SetpushButton_clicked()));
     connect(m_waitstu, SIGNAL(wait_shutdown()), this, SLOT(on_ShutdownpushButton_clicked()));
 
@@ -298,37 +234,25 @@ LoginWidget::LoginWidget(QWidget *parent) :
 	pthread_mutex_init(&g_hreadMutex, NULL);
 	pthread_mutex_init(&g_freestudyMutex, NULL);
     g_pNetConfig = new NetConfig();
-    if(g_pLog == NULL)
-    {
-        g_pLog = new Log();
-        g_pLog->InitLog();
-    }
     if(g_pJson == NULL)
     {
         g_pJson = new myJson();
     }
+#if 1
     if(g_pMyHttp == NULL)
     {
         g_pMyHttp = new myHttp();
         g_pMyHttp->SetUrlIP(QString(g_strServerIP));
     }
+#endif
+
     g_ExitMsThread = false;
     g_processThread = false;
 	g_bExit_freeStuy_flag = false;
     g_bshowwaitstu = false;
-#if 1
-    this->hide();
-    ReportMsg reportmsg;
-    reportmsg.action = USER_WAITINGDLG_SHOW;
-    call_msg_back(msg_respose, reportmsg);
-#endif
     g_spicyProcessExit = false;
-    initConfig();
     g_mqMsgProcess.start();
     g_bSetupAmq = false;
-    wait_net_setup();
-    g_resetamq = false;
-    g_exitMonitoramq = false;
     m_pqthread = NULL;
     m_pqthread = new qthread();
     connect(m_pqthread, SIGNAL(NoticeShow()), this, SLOT(UpdateNetOffDialog()));
@@ -355,20 +279,20 @@ LoginWidget::LoginWidget(QWidget *parent) :
 //    }
      QString strsoft(g_szLocalIP);
      m_pSoftInforLabel->setText(strsoft);
+#if 1
 #ifdef ARM
-	if(pthread_create(&g_spicypid,NULL,MonitorSpicy,this))
-	{
-	}
+    if(pthread_create(&g_spicypid,NULL,MonitorSpicy,this))
+    {
+    }
+#endif
 #endif
 
+#if 0
     if(pthread_create(&g_amqpid,NULL,InitThread,this))
     {
     }
+#endif
 
-	//monitor amq heart 
-    if(pthread_create(&g_heartid,NULL,HeartThread,this))
-    {
-    }
 #if 0
     SetEnable(true);
     m_pClassNameConfig->m_iClassNum = 0;
@@ -378,6 +302,15 @@ LoginWidget::LoginWidget(QWidget *parent) :
     m_pClassNameConfig->ChooseOne();
     m_pClassNameConfig->SetLabelName();
 #endif
+
+    g_mqMsgProcess.startMulticast();
+#if 1
+    g_mqMsgProcess.strart_spicyThrd();
+#endif
+    char szVer[100] = {0};
+    strcpy(szVer, "V1.1_");
+    strcat(szVer, (char*)buildtime);
+    WriteConfigString(CONFIGNAME, "ROOM", "Version", szVer);
 }
 
 void LoginWidget::SetEnable(bool flag)
@@ -389,124 +322,59 @@ void LoginWidget::SetEnable(bool flag)
     m_pClassName2->setEnabled(flag);
     m_pClassName3->setEnabled(flag);
 }
+
 void *InitThread(void *param)
 {
     if (param == NULL)
         return NULL;
-
     LoginWidget *pLoginWidget = (LoginWidget *)param;
-    g_resetamq = false;
-    while(true)
-    {
-        if (g_bSetupAmq)
-        {
-           int ret = ping_net(g_strServerIP);
-           if (ret == 1)
-           {
-               break;
-           }
-        }
-        //qDebug() << "wait net running.\n";
-        sleep(2);
-    }
-    g_Pconsume = NULL;
-    g_Pproduce = NULL;
-    if(g_Pconsume == NULL)
-    {
-        g_Pconsume = new ActiveMQConsumer();
-        g_Pconsume->start(g_strConsumerAdd,g_strConsumerQueue,false,false);
-    }
-    if(g_Pproduce == NULL)
-    {
-        g_Pproduce = new ActiveMQProduce();
-    }
-    if(g_Pconsume != NULL)
-    {
-        g_Pconsume->runConsumer();
-    }
-    if (g_Pproduce != NULL)
-    {
-        g_Pproduce->start(g_strProduceAdd,20,g_strProduceQueue,false,false);
-    }
-    g_mqMsgProcess.GetAddrMac();
-//#ifdef  ARM
+//    while(true)
+//    {
+//        if (g_bSetupAmq)
+//        {
+//           int ret = ping_net(g_strServerIP);
+//           if (ret == 1)
+//           {
+//               break;
+//           }
+//        }
+//        sleep(1);
+//    }
 #if 1
-	myHttp http;
-	http.SetUrlIP(g_strServerIP);
-	char data[100] = {0};
-	char json[100] = {0};
-	bool bjson = false;
-	sprintf(data,"%s","/service/aps/timestamp");
-	http.Get(data);
-	http.GetData(json);
-	g_pLog->WriteLog(0,"student client get timestamp http return data initthread:%s", json);
-	g_pJson->Parse(json);
-	g_pJson->ReadJson(&bjson, "success");
-	if (bjson)
-	{
-		memset(data, 0, 100);
-		g_pJson->ReadJson_v(data, "data", "systemTime");
-		g_pLog->WriteLog(0,"InitThread student client recv server time:%s", data);
-		g_interval_time = atoll(data);
-		g_pLog->WriteLog(0,"student client recv server time atoll = :%lld", g_interval_time);
-		//g_interval_time = (unsigned long long)abs(g_interval_time - __GetTime());
-		g_interval_time = g_interval_time - __GetTime();
-		g_pLog->WriteLog(0,"student client recv server time g_interval_time = :%lld,  _GetTime = %lld", g_interval_time, __GetTime());
-	}
-#endif
-	
- //   g_pProcess->GetAddrMac();
-    ///////////////////////////////////////////////////////////////
-//    char TempBuf[1024];
-//    char JsonBuf[10240];
-//    memset(JsonBuf,0,10240);
-//    memset(TempBuf,0,1024);
-//    sprintf(TempBuf,"/service/aps/config?id=%s&roomName=%s&seat=%s&reboot=false&sync=false",g_strTerminalID,g_strRoomNum,g_strSeatNum);
-//    g_pLog->WriteLog(0,"UP SeatNum RoomNum:%s",TempBuf);
-//   // qDebug("TempBuf:%s",TempBuf);
-//    myHttp http;
-//    http.SetUrlIP(g_strServerIP);
-//    http.Get(TempBuf);
-//    http.GetData(JsonBuf);
-//    qDebug("xxxxxx amq UP SeatNum RoomNum%s\n",JsonBuf);
-//    g_pLog->WriteLog(0,"Recv Json:%s",JsonBuf);
-
-    ///////////////////////////////////////////////////////////////
-    /// \brief strClassRoomName
-    ///
-#if 0
-    char strClassRoomName[20][100];
-    memset(JsonBuf,0,10240);
-    memset(TempBuf,0,1024);
-    sprintf(TempBuf, "/service/rooms/list?qp.sortby=name&qp.direction=asc");
-    http.Get(TempBuf);
-    http.GetData(JsonBuf);
-    g_pLog->WriteLog(0,"Recv Json:%s", JsonBuf);
-    memset(strClassRoomName, 0, sizeof(strClassRoomName));
-    myJson *pMyJson = new myJson();
-    int iRecode = 0;
-    pMyJson->Parse(JsonBuf);
-    iRecode = pMyJson->ReadJson(strClassRoomName, "data", "list", "name", 20);
-    for (int i=0; i<iRecode; i++)
+    while(1)
     {
-        if (strcmp(g_strRoomNum, strClassRoomName[i]) == 0)
-        {
-            pLoginWidget->m_pSetForm->m_pRoomNumcomboBox->addItem(QString(g_strRoomNum));
+        if (g_ExitMsThread)
             break;
-        }
-    }
-    for (int i=0; i<iRecode; i++)
-    {
-        if (strcmp(g_strRoomNum, strClassRoomName[i]) != 0)
+        if (g_bgetserTime)
         {
-            pLoginWidget->m_pSetForm->m_pRoomNumcomboBox->addItem(QString(strClassRoomName[i]));
+            myHttp http;
+            http.SetUrlIP(g_strServerIP);
+            char data[100] = {0};
+            char json[100] = {0};
+            bool bjson = false;
+            sprintf(data,"%s","/service/aps/timestamp");
+            http.Get(data);
+            http.GetData(json);
+            g_pLog->WriteLog(0,"student client get timestamp http return data initthread:%s", json);
+            g_pJson->Parse(json);
+            g_pJson->ReadJson(&bjson, "success");
+            if (bjson)
+            {
+                memset(data, 0, 100);
+                g_pJson->ReadJson_v(data, "data", "systemTime");
+                g_pLog->WriteLog(0,"InitThread student client recv server time:%s", data);
+                g_interval_time = atoll(data);
+                g_pLog->WriteLog(0,"student client recv server time atoll = :%lld", g_interval_time);
+                //g_interval_time = (unsigned long long)abs(g_interval_time - __GetTime());
+                g_interval_time = g_interval_time - __GetTime();
+                g_pLog->WriteLog(0,"student client recv server time g_interval_time = :%lld,  _GetTime = %lld", g_interval_time, __GetTime());
+            }
         }
+        usleep(1000);
     }
-
-    if (pMyJson)
-        delete pMyJson;
-    pLoginWidget->m_pSetForm->m_pRoomNumcomboBox->setCurrentIndex(0);
 #endif
+    pthread_detach(pthread_self());
+    return NULL;
 }
 void *WhileFun(void *param)
 {
@@ -515,36 +383,6 @@ void *WhileFun(void *param)
 
     LoginWidget *p = (LoginWidget *)param;
         p->Thread();
-}
-
-void LoginWidget::initConfig()
-{
-    g_pNetConfig->GetMacAdd(g_strTerminalID,false);
-    strcat(g_strConsumerQueue, "edu_");
-    strcat(g_strConsumerQueue, g_strTerminalID);
-    GetConfigString(CONFIGNAME,"MQ","ProduceQueue","edu_Queue",g_strProduceQueue,50);
-    GetConfigString(CONFIGNAME,"ROOM","ServiceIP","192.168.120.36",g_strServerIP,25);
-#ifdef _DEBUG_PRINT
-    qDebug("Service:%s",g_strServerIP);
-#endif
-    strcpy(g_strConsumerAdd,"failover://(tcp://");
-    strcat(g_strConsumerAdd,g_strServerIP);
-    strcat(g_strConsumerAdd,":61616");
-    strcat(g_strConsumerAdd, ")?connectionTimeout=5000&timeout=5000");
-      strcpy(g_strProduceAdd, g_strConsumerAdd);
-#ifdef _DEBUG_PRINT
-    qDebug("ActiveMQ Server:%s Recv Queue:%s Send Queue:%s",g_strConsumerAdd, g_strConsumerQueue,g_strProduceQueue);
-    qDebug(g_strProduceAdd);
-#endif
-    GetConfigString(CONFIGNAME,"ROOM","ClassName","Default",g_strRoomNum,100);
-    GetConfigString(CONFIGNAME,"ROOM","SeatName","A1",g_strSeatNum,20);
-#ifdef _DEBUG_PRINT
-    qDebug("%s %s",g_strRoomNum, g_strSeatNum);
-#endif
-    char szVer[100] = {0};
-    strcpy(szVer, "V1.1_");
-    strcat(szVer, (char*)buildtime);
-    WriteConfigString(CONFIGNAME, "ROOM", "Version", szVer);
 }
 
 void LoginWidget::SetChecked()
@@ -612,7 +450,6 @@ void LoginWidget::OnTimeOut()
 LoginWidget::~LoginWidget()
 {
     cMainExitFlag = 0;
-    g_exitMonitoramq = true;
     m_bExitThread = true;
     if(m_pMyDialog)
         delete m_pMyDialog;
@@ -625,23 +462,12 @@ LoginWidget::~LoginWidget()
     delete g_pMyHttp;
     if(g_LoadingFrame)
         delete g_LoadingFrame;
-//    if (g_Loadingwnd != NULL)
-//    {
-//        delete g_Loadingwnd;
-//        g_Loadingwnd = NULL;
-//    }
 //    msg_queue_del();
-    pthread_join(g_monitoramq, NULL);
     if (m_pqthread)
     {
         m_pqthread->stop();
         delete m_pqthread;
     }
-//    if (m_waitstuDialog)
-//    {
-//        delete m_waitstuDialog;
-//        m_waitstuDialog = NULL;
-//    }
     if (m_waitstu)
     {
         delete m_waitstu;
@@ -649,7 +475,7 @@ LoginWidget::~LoginWidget()
     }
     g_ExitMsThread = true;
     MyMutex_destroy();
-    	pthread_mutex_destroy(&g_hreadMutex);
+    pthread_mutex_destroy(&g_hreadMutex);
 	pthread_mutex_destroy(&g_freestudyMutex);
     g_spicyProcessExit = true;
 	activemq::library::ActiveMQCPP::shutdownLibrary();
@@ -754,13 +580,13 @@ void *thrd_connect(void *)
     g_pLog->WriteLog(0,"Name :%s ID:%s",name.toStdString().c_str(),id.toStdString().c_str());
     //bool ReturnCode = false;
     char TempBuf[1024];
-    char JsonBuf[1024];
+    //char JsonBuf[1024];
     //int Port = 0;
-    char IP[20];
-    char Ticket[50];
-    memset(IP,0,20);
-    memset(Ticket,0,50);
-    memset(JsonBuf,0,1024);
+    //char IP[20];
+    //char Ticket[50];
+    //memset(IP,0,20);
+    //memset(Ticket,0,50);
+    //memset(JsonBuf,0,1024);
     memset(TempBuf,0,1024);
 #ifdef ARM
     long long last_time = 0;
@@ -775,30 +601,37 @@ void *thrd_connect(void *)
         sprintf(TempBuf,"###request_display###{\"datetime\":\"%s\",\"data\":{\"id\":\"%s\",\"templateId\":\"%s\"}}", str_time.toStdString().c_str(), g_strTerminalID, id.toStdString().c_str());
     }
     g_pLog->WriteLog(0,"Stuself Connect Post Buf:%s",TempBuf);
+    if (NULL != g_Pproduce)
+        g_Pproduce->send(TempBuf, strlen(TempBuf));
    // qDebug("Stuself Connect Post Buf:%s",TempBuf);
    // sprintf(TempBuf,"http://192.168.8.234:9090/service/desktops/stu_display");
-    int run_count = 0;
-    while(run_count <= 30)  //one miniture exit
-    {
-        pthread_mutex_lock(&g_freestudyMutex);
-		if (g_bExit_freeStuy_flag)
-		{
-			pthread_mutex_unlock(&g_freestudyMutex);
-			break;
-		}
-		pthread_mutex_unlock(&g_freestudyMutex);
-        //myHttp http;
-        //http.SetUrlIP(g_strServerIP);
-        //http.Get(TempBuf);
-        //http.GetData(JsonBuf);
-        if (NULL != g_Pproduce)
-            g_Pproduce->send(TempBuf, strlen(TempBuf));
-        run_count++;
-        sleep(5);
-    }//while
-    ReportMsg reportmsg;
-    reportmsg.action = USER_WAITINGDLG_EXIT;
-    call_msg_back(msg_respose, reportmsg);
+/****************************************************************************/
+//    int run_count = 0;
+//    while(run_count <= 20)  //one miniture exit
+//    {
+//        pthread_mutex_lock(&g_freestudyMutex);
+//		if (g_bExit_freeStuy_flag)
+//		{
+//			pthread_mutex_unlock(&g_freestudyMutex);
+//			break;
+//		}
+//		pthread_mutex_unlock(&g_freestudyMutex);
+//        //myHttp http;
+//        //http.SetUrlIP(g_strServerIP);
+//        //http.Get(TempBuf);
+//        //http.GetData(JsonBuf);
+//        if (NULL != g_Pproduce)
+//            g_Pproduce->send(TempBuf, strlen(TempBuf));
+//        run_count++;
+//        sleep(1);
+//    }//while
+//    if (!g_bExit_freeStuy_flag)
+//    {
+//        ReportMsg reportmsg;
+//        reportmsg.action = USER_WAITINGDLG_EXIT;
+//        call_msg_back(msg_respose, reportmsg);
+//    }
+    pthread_detach(pthread_self());
     return NULL;
 }
 
@@ -881,22 +714,6 @@ void LoginWidget::HideNetOffDialog()
         //qDebug() << "hide netoff dailog 11111.";
         m_pMyDialog->setShow(false);
         m_pMyDialog->hide();
-    }
-}
-
-void LoginWidget::rebootAmqThrd()
-{
-    pthread_join(g_amqpid, NULL);
-    if (NULL != g_Pconsume)
-    {
-        g_Pconsume->cleanup();
-    }
-    if (NULL != g_Pproduce)
-    {
-        g_Pproduce->cleanup();
-    }
-    if(pthread_create(&g_amqpid,NULL,InitThread,this))
-    {
     }
 }
 

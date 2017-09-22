@@ -13,6 +13,7 @@
 #include <signal.h>
 #include "log.h"
 #include <QDebug>
+#include "include.h"
 
 extern Log *g_pLog;
 extern volatile bool g_bSetupAmq;
@@ -24,8 +25,6 @@ struct ethtool_value {
 typedef enum { IFSTATUS_UP, IFSTATUS_DOWN, IFSTATUS_ERR } interface_status_t;  
 static char hw_name[10] = {'\0'};
 static pthread_t g_nettid = NULL;
-static pthread_t g_amqpid = NULL;
-
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static interface_status_t interface_detect_beat_ethtool(int fd, char *iface)
@@ -81,14 +80,10 @@ static void gethw_name()
 //extern bool g_bpause_net_check;
 static void* thrd_net_setup(void * param)
 {
+    g_pLog->WriteLog(0, "thread qt thrd_net_setup, pid: %u, tid: %u .", (unsigned int)getpid(), (unsigned int)syscall(SYS_gettid));
+    gethw_name();
 	for (;;)
 	{
-//        if (g_bpause_net_check)
-//        {
-//            qDebug() << "thrd_net_setup  net checking .....";
-//            sleep(2);
-//            continue;
-//        }
 		int fd;
 		interface_status_t status;
 		if((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)  
@@ -98,51 +93,30 @@ static void* thrd_net_setup(void * param)
             //qDebug() << " thrd_net_setup socket error, thrd_net_setup exit. \n";
 			break; 
 		}
-        //g_pLog->WriteLog(0, "thrd_net_setup 333333333333333333 .\n");
 		status = interface_detect_beat_ethtool(fd, hw_name);  
 		close(fd);
 		if (status == IFSTATUS_UP)
 		{
-            //g_pLog->WriteLog(0, "thrd_net_setup 22222222222222222222  normal .\n");
-            //qDebug() << " thrd_net_setup 22222222222222222222  normal. ";
-            //pthread_mutex_lock(&mutex);
             g_bSetupAmq = true;
-            //pthread_mutex_unlock(&mutex);
 		}
 		if (status == IFSTATUS_DOWN)
 		{
-            g_pLog->WriteLog(0, "thrd_net_setup network not ping. \n");
-            //pthread_mutex_lock(&mutex);
+            //g_pLog->WriteLog(0, "thrd_net_setup network disconnect .\n");
             g_bSetupAmq = false;
-            //pthread_mutex_unlock(&mutex);
 		}
-//        if (g_amqpid != NULL)
-//        {
-//            int pthread_kill_err = pthread_kill(g_amqpid, 0);
-//            if (pthread_kill_err == ESRCH)
-//            {
-//                //g_pLog->WriteLog(0, "thrd_net_setup 22222222222222222222 amq thread not exist or exit.\n");
-//            }else if (pthread_kill_err == EINVAL)
-//            {
-//                //g_pLog->WriteLog(0, "thrd_net_setup 22222222222222222222 amq thread send einval signal.\n");
-//            }else
-//            {
-//                //g_pLog->WriteLog(0, "thrd_net_setup 22222222222222222222 amq thread is alive.\n");
-//            }
-//        }
-		sleep(5);
+        sleep(5);
 	}
+    pthread_detach(pthread_self());
+    return NULL;
 }
 
 static void wait_net_setup()
 {
-	gethw_name();
     if ( pthread_create(&g_nettid, NULL, thrd_net_setup, NULL) !=0 )
 	{
         g_pLog->WriteLog(0, "zhaosenhua wait_net_setup create thread failed.");
 		printf("Create thread error!\n");
 	};
-    //pthread_join(tid, NULL);
 }
 
 #endif // TESTNET_H

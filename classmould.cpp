@@ -43,6 +43,7 @@ void ClassMould::mousePressEvent(QMouseEvent *event)
       m_bIsChecked = true;
       emit LabelChecked();
     }
+    QWidget::mousePressEvent(event);
 }
 void ClassMould::SetClassName(QString name)
 {
@@ -72,6 +73,7 @@ void ClassMould::enterEvent(QEvent *event)
     {
         //this->setPixmap(QPixmap(CLASSENTER));
     }
+    QWidget::enterEvent(event);
 }
 void ClassMould::leaveEvent(QEvent *event)
 {
@@ -84,6 +86,7 @@ void ClassMould::leaveEvent(QEvent *event)
     {
         //this->setPixmap(QPixmap(CLASS));
     }
+    QWidget::leaveEvent(event);
 }
 bool ClassMould::IsChecked()
 {
@@ -105,4 +108,5 @@ void ClassMould::mouseDoubleClickEvent(QMouseEvent *event)
 
 //    reportmsg.action = USER_MSG_FREESTUDY;
 //    call_msg_back(msg_respose, reportmsg);
+     QWidget::mouseDoubleClickEvent(event);
 }

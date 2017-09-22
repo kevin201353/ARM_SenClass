@@ -40,7 +40,8 @@ SOURCES += main.cpp\
     stwidget.cpp \
     aboutui.cpp \
     mqmsgprocess.cpp \
-    multimsg.cpp
+    multimsg.cpp \
+    sysInfo.cpp
 
 HEADERS  += loginwidget.h \
     setform.h \
@@ -72,7 +73,9 @@ HEADERS  += loginwidget.h \
     aboutui.h \
     mqmsgprocess.h \
     type.h \
-    multimsg.h
+    multimsg.h \
+    netlink.h \
+    sysInfo.h
 
 FORMS    += loginwidget.ui \
     setform.ui \

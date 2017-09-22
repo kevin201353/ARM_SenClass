@@ -1,4 +1,5 @@
 #include "log.h"
+#include "include.h"
 
 void *WriteLogThread(void *param);
 
@@ -123,6 +124,7 @@ void Log::ThreadFun()
             }
             iWriteNum = 0;
         }
+        usleep(500);
     }
 }
 

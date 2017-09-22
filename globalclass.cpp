@@ -96,29 +96,34 @@ int ping_net(char *ip)
     {
         char szbuf[100] = {0};
         char data[100] = {0};
-        sprintf(szbuf, "sudo ping %s -c 4 > /usr/local/shencloud/log/ping_net.log", ip);
+        sprintf(szbuf, "ping %s -c 4 -i 0.5 > /usr/local/shencloud/log/ping_net.log", ip);
         system(szbuf);
-        MyMutex_lock();
+        //MyMutex_lock();
         FILE *fp = fopen("/usr/local/shencloud/log/ping_net.log", "r");
         if (fp != NULL)
         {
+            int ncount = 0;
             while(fgets(data, 100, fp) != NULL)
             {
-                if (strstr(data, "ttl=")!= NULL && strstr(data, "time=") != NULL)
+                if (ncount == 2)
                 {
-                    MyMutex_unlock();
-                    fclose(fp);
-                    return 1;
-                }else if (strstr(data, "Destination Host Unreachable"))
-                {
-                    MyMutex_unlock();
-                    fclose(fp);
-                    return 0;
+                    if (strstr(data, "ttl=")!= NULL && strstr(data, "time=") != NULL)
+                    {
+                        //MyMutex_unlock();
+                        fclose(fp);
+                        return 1;
+                    }else
+                    {
+                        //MyMutex_unlock();
+                        fclose(fp);
+                        return 0;
+                    }
                 }
+                ncount++;
             }
             fclose(fp);
         }
-        MyMutex_unlock();
+        //MyMutex_unlock();
     }
     return 0;
 }

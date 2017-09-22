@@ -260,7 +260,7 @@ int process::ProcessThread()
                     system("kill -9 $(pgrep spicy)");
                     //system("killall -9 spicy");
  //                   m_SpicyPid = Run_Spicy(IP,(unsigned int)Port,Ticket);
-                    sprintf(g_szCmd, "spicy.sh -h %s -p %d -f > %s", IP, Port, "/usr/local/shencloud/log/spicy.log");
+                    sprintf(g_szCmd, "spicy -h %s -p %d -f > %s", IP, Port, SPICY_LOG_PATH);
                     strcpy(g_szRetVm, g_szCmd);
                     if (pthread_create(&g_xtid, NULL, thrd_exec, NULL) != 0)
                     {
@@ -514,9 +514,11 @@ void *ThreadForSystem(void *para)
     {
         strcpy(SystemBuf,p);
         g_pLog->WriteLog(0, "ThreadForSystem, _system !!!!!, command: %s", SystemBuf);
-        system(SystemBuf);
-        //_system(SystemBuf);
+        //system("export DISPLAY=:0.0");
+        _system(SystemBuf);
     }
+    pthread_detach(pthread_self());
+    return NULL;
 }
 void process::Lock()
 {
@@ -808,7 +810,7 @@ int detect_process(char* szProcess)
     int count = 0;
     char buf[BUF_SIZE] = {0};
     char command[BUF_SIZE] = {0};
-    sprintf(command, "sudo ps -ef | grep %s | grep -v grep | wc -l", szProcess);
+    sprintf(command, "ps -ef | grep %s | grep -v grep | wc -l", szProcess);
     fp = popen(command, "r");
     if (fp == NULL)
     {
@@ -821,11 +823,11 @@ int detect_process(char* szProcess)
     if (fgets(buf, BUF_SIZE, fp) != NULL)
     {
         count = atoi(buf);
-//		//test
-//		char sztmp[512] = {0};
-//		sprintf(sztmp, "22222  detect_process(), fgets buf = %s.", buf);
-//		g_pLog->WriteLog(0,sztmp);
-//		//test
+//        //test
+//        char sztmp[512] = {0};
+//        sprintf(sztmp, "22222  detect_process(), fgets buf = %s.", buf);
+//        g_pLog->WriteLog(0,sztmp);
+//        //test
         if (count == 0)
             nRet = 0;
         else
@@ -845,7 +847,7 @@ int process::connect_vm(char *ip, char *port, char *vmid)
     {
         system("sudo kill -9 $(pgrep spicy)");
     }
-    sprintf(g_szCmd, "sudo spicy -h %s -p %s -f > %s 2>&1", ip, port, "/usr/local/shencloud/log/spicy.log");
+    sprintf(g_szCmd, "sudo spicy -h %s -p %s -f > %s 2>&1", ip, port, SPICY_LOG_PATH);
     strcpy(g_szRetVm, g_szCmd);
     if (pthread_create(&g_xtid, NULL, thrd_exec, NULL) != 0)
     {
