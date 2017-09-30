@@ -96,39 +96,7 @@ void _display_vm2(char *cmd)
     int nCount = 0;
     while(access("/tmp/data_port",F_OK))
     {
-        if (nCount >= 20)
-            break;
-        sleep(1);
-        nCount++;
-    }
-    memset(port,0,20);
-    FILE *pf = fopen("/tmp/data_port","r");
-    if(pf != NULL)
-    {
-        fread(port,20,1,pf);
-        g_pLog->WriteLog(0,"/tmp/data_port:%s",port);
-        fclose(pf);
-    }
-    memset(data_xor,0,20);
-    pf = fopen("/tmp/data_xor","r");
-    if(pf != NULL)
-    {
-        fread(data_xor,20,1,pf);
-        g_pLog->WriteLog(0,"/tmp/data_xor:%s",data_xor);
-        fclose(pf);
-    }
-}
-void _display_vm3(char *cmd)
-{
-    pthread_t pid;
-    if (!g_deamonflag)
-    {
-        _system(cmd);
-    }
-    int nCount = 0;
-    while(access("/tmp/data_port",F_OK))
-    {
-        if (nCount >= 200000)
+        if (nCount >= 2000)
             break;
         usleep(1000);
         nCount++;
@@ -165,9 +133,9 @@ void _display_vm(char *cmd)
     int nCount = 0;
     while(access("/tmp/data_port",F_OK))
     {
-        if (nCount >= 20)
+        if (nCount >= 2000)
             break;
-        sleep(1);
+        usleep(1000);
         nCount++;
     }
     memset(port,0,20);
@@ -200,6 +168,9 @@ static void *DemoThreadForSystem(void *para)
         printf("sysTem:%s\n",SystemBuf);
 #endif
         _system(SystemBuf);
+    }else
+    {
+        g_pLog->WriteLog(0, "DemoThreadForSystem, p = null");
     }
     pthread_detach(pthread_self());
     return NULL;
@@ -218,9 +189,9 @@ void _demo_display_vm(char *)
     int nCount = 0;
     while(access("/tmp/data_port",F_OK))
     {
-        if (nCount >= 20)
+        if (nCount >= 2000)
             break;
-        sleep(1);
+        usleep(1000);
         nCount++;
     }
     memset(port,0,20);
@@ -313,7 +284,6 @@ void MqMsgProcess:: _MqMsgProcess()
         if (g_myBuffer.isEmpty())
         {
 #if 0
-            qDebug() << "MqMsgProcess::_MqMsgProcess no msg : ";
 		   g_pLog->WriteLog(0,"MqMsgProcess::_MqMsgProcess no msg : ");
 #endif
             sleep(2);
@@ -374,7 +344,7 @@ void MqMsgProcess:: _MqMsgProcess()
               g_pLog->WriteLog(0, szleasped);
               g_myBuffer.clear();
               sleep(1);
-              //continue;
+              continue;
         }
         g_pJson->ReadJson(ActionBuf,"action");
         g_pLog->WriteLog(0,"Action:%s",ActionBuf);
@@ -383,17 +353,20 @@ void MqMsgProcess:: _MqMsgProcess()
 #endif
         if (strcmp(ActionBuf,"classbegin") == 0)
         {
+            g_currclass_state = 0;
+            memset(g_szRetVm, 0, sizeof(g_szRetVm));
             if (!g_deamonflag)
             {
                 _kill_spicy_eclass("spicy", "eclass_client_udp");
     #ifdef ARM
+
                 system("rk3188_clean_display");
     #endif
                 ReportMsg reportmsg;
                 reportmsg.action = USER_WAITINGDLG_SHOW;
                 call_msg_back(msg_respose, reportmsg);
-                g_currclass_state = 0;
             }
+            g_myBuffer.clear();
         }//begin
         if (strcmp(ActionBuf,"display") == 0)
         {
@@ -416,7 +389,7 @@ void MqMsgProcess:: _MqMsgProcess()
                 ReportMsg reportmsg;
                 reportmsg.action = USER_WAITINGDLG_SHOW;
                 call_msg_back(msg_respose, reportmsg);
-                _display_vm3(g_szCmd);
+                _display_vm2(g_szCmd);
                 g_currclass_state = 1;
             }else
             {
@@ -439,6 +412,7 @@ void MqMsgProcess:: _MqMsgProcess()
             g_Pproduce->send(MessageBuf, strlen(MessageBuf));
             g_pLog->WriteLog(0,"zhaosenhua send msg response display 00000: %s", MessageBuf);
             //qDebug("display response end.\n");
+            g_myBuffer.clear();
         }//display
         if (strcmp(ActionBuf,"classover") == 0)
         {
@@ -512,6 +486,7 @@ void MqMsgProcess:: _MqMsgProcess()
                     g_pLog->WriteLog(0,"zhaosenhua send msg response freeStudy: %s", MessageBuf);
                 }
             }
+            g_myBuffer.clear();
         }
         if (strcmp(ActionBuf,"free_display") == 0)
 		{
@@ -531,16 +506,16 @@ void MqMsgProcess:: _MqMsgProcess()
             qDebug("begin class IP:%s Port:%s VmID:%s", sz_host, sz_port, sz_vmid);
 #endif
             g_pLog->WriteLog(0,"begin class IP:%s Port:%s VmID:%s", sz_host, sz_port, sz_vmid);
-            sprintf(g_szCmd, "spicy -h %s -p %s -f >> %s 2>&1", sz_host, sz_port, SPICY_LOG_PATH);
+            sprintf(g_szCmd, "spicy -h %s -p %s -f > %s 2>&1", sz_host, sz_port, SPICY_LOG_PATH);
             strcpy(g_szRetVm, g_szCmd);
             _display_vm(g_szCmd);
             g_currclass_state = 1;
             sprintf(MessageBuf,"###ap_confirmfreedisplay###{\"datetime\":\"%s\",\"data\":{\"action\":\"%s\",\"id\":\"%s\", \"apIp\":\"%s\",\"mac\":\"%s\", \"vmId\":\"%s\", \"connected\":%d, \"dsPort\":%ld, \"dsXor\":%ld}}", str_time.toStdString().c_str(), ActionBuf, g_strTerminalID, m_strIP, m_strMac, sz_vmid, 1, atol(port), atol(data_xor));
             g_Pproduce->send(MessageBuf, strlen(MessageBuf));
             g_pLog->WriteLog(0,MessageBuf);
+            g_myBuffer.clear();
 		}
-        g_myBuffer.clear();
-        sleep(1);
+        usleep(1000);
     }
     //qDebug("MqMsgProcess deal amq msg process exit ! \n");
 }
@@ -622,25 +597,18 @@ void MqMsgProcess::_spicyProcess()
             {
                 if (g_bSetupAmq)
                 {
-                   //int ret = ping_net(g_strServerIP);
-                   //if (ret == 1)
-                   {
                       QString strRet(g_szRetVm);
                       if (!strRet.isEmpty() || strRet.length() > 0)
                       {
-                          if (g_currclass_state == 1)
-                          {
+                            if (detect_process("spicy") == 0 && g_currclass_state == 1)
+                            {
                                 g_pLog->WriteLog(0,"zhaosenhua MqMsgProcess::_spicyProcess reconnect vm.");
-                                if (detect_process("spicy") == 0)
-                                    _display_vm(g_szRetVm);
-                          }
+                                _display_vm(g_szRetVm);
+                            }
                       }
-                   }
                 }
             }else
             {
-               //int ret = ping_net(g_strServerIP);
-               //if (ret == 0 && !g_bSetupAmq)
                 if (!g_bSetupAmq)
                {
                     _kill_spicy_eclass("spicy", NULL);
@@ -655,32 +623,30 @@ void MqMsgProcess::_spicyProcess()
             {
                 if (g_bSetupAmq)
                 {
-                   //int ret = ping_net(g_strServerIP);
-                   //if (ret == 1)
+                   QFile file(DEMOFLAG);
+                   if (!file.exists() && !g_showloal)
                    {
-                       QFile file(DEMOFLAG);
-                       if (!file.exists() && !g_showloal)
-                       {
-                          QString strRet(g_szCommand);
-                          if (!strRet.isEmpty() || strRet.length() > 0)
+                      QString strRet(g_szCommand);
+                      if (!strRet.isEmpty() || strRet.length() > 0)
+                      {
+                          g_pLog->WriteLog(0,"zhaosenhua MqMsgProcess::_spicyProcess reconnect eclass_client_udp.");
+                          nRet = detect_process("eclass_client_udp");
+                          if (nRet == 0)
                           {
-                              g_pLog->WriteLog(0,"zhaosenhua MqMsgProcess::_spicyProcess reconnect eclass_client_udp.");
                               _system(g_szCommand);
                           }
-                       }
+                      }
                    }
                 }
             }else
             {
-               //int ret = ping_net(g_strServerIP);
-               //if (ret == 0 && !g_bSetupAmq)
                if (!g_bSetupAmq)
                {
                     _kill_spicy_eclass(NULL, "eclass_client_udp");
                }
             }
         }
-        usleep(500);
+        usleep(2000000);
     }
     //g_pLog->WriteLog(0,"zhaosenhua MqMsgProcess::_spicyProcess exit !!!");
 }

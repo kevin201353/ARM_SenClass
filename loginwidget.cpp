@@ -26,7 +26,7 @@ static bool g_ExitMsThread = false;
 bool   g_processThread = false;
 MqMsgProcess  g_mqMsgProcess;
 static pthread_t g_amqpid = NULL;
-static pthread_mutex_t g_hreadMutex;
+pthread_mutex_t g_hreadMutex;
 
 pthread_mutex_t g_freestudyMutex;
 
@@ -55,20 +55,6 @@ static void *MonitorSpicy(void *param)
     {
         if (g_ExitMsThread)
             break;
-
-//		while(true)
-//	    {
-//            if (g_bSetupAmq)
-//	        {
-//	           int ret = ping_net(g_strServerIP);
-//	           if (ret == 1)
-//	           {
-//	               break;
-//	           }
-//            }
-//            //qDebug() << "MonitorSpicy wait net running.\n";
-//            sleep(3);
-//        }
         if (g_bgetserTime)
         {
             myHttp http;
@@ -328,18 +314,6 @@ void *InitThread(void *param)
     if (param == NULL)
         return NULL;
     LoginWidget *pLoginWidget = (LoginWidget *)param;
-//    while(true)
-//    {
-//        if (g_bSetupAmq)
-//        {
-//           int ret = ping_net(g_strServerIP);
-//           if (ret == 1)
-//           {
-//               break;
-//           }
-//        }
-//        sleep(1);
-//    }
 #if 1
     while(1)
     {
@@ -578,15 +552,7 @@ void *thrd_connect(void *)
     QString id = loginWid->m_pClassNameConfig->GetClassID();
     //qDebug("Name :%s ID:%s",name.toStdString().c_str(),id.toStdString().c_str());
     g_pLog->WriteLog(0,"Name :%s ID:%s",name.toStdString().c_str(),id.toStdString().c_str());
-    //bool ReturnCode = false;
     char TempBuf[1024];
-    //char JsonBuf[1024];
-    //int Port = 0;
-    //char IP[20];
-    //char Ticket[50];
-    //memset(IP,0,20);
-    //memset(Ticket,0,50);
-    //memset(JsonBuf,0,1024);
     memset(TempBuf,0,1024);
 #ifdef ARM
     long long last_time = 0;
@@ -603,34 +569,6 @@ void *thrd_connect(void *)
     g_pLog->WriteLog(0,"Stuself Connect Post Buf:%s",TempBuf);
     if (NULL != g_Pproduce)
         g_Pproduce->send(TempBuf, strlen(TempBuf));
-   // qDebug("Stuself Connect Post Buf:%s",TempBuf);
-   // sprintf(TempBuf,"http://192.168.8.234:9090/service/desktops/stu_display");
-/****************************************************************************/
-//    int run_count = 0;
-//    while(run_count <= 20)  //one miniture exit
-//    {
-//        pthread_mutex_lock(&g_freestudyMutex);
-//		if (g_bExit_freeStuy_flag)
-//		{
-//			pthread_mutex_unlock(&g_freestudyMutex);
-//			break;
-//		}
-//		pthread_mutex_unlock(&g_freestudyMutex);
-//        //myHttp http;
-//        //http.SetUrlIP(g_strServerIP);
-//        //http.Get(TempBuf);
-//        //http.GetData(JsonBuf);
-//        if (NULL != g_Pproduce)
-//            g_Pproduce->send(TempBuf, strlen(TempBuf));
-//        run_count++;
-//        sleep(1);
-//    }//while
-//    if (!g_bExit_freeStuy_flag)
-//    {
-//        ReportMsg reportmsg;
-//        reportmsg.action = USER_WAITINGDLG_EXIT;
-//        call_msg_back(msg_respose, reportmsg);
-//    }
     pthread_detach(pthread_self());
     return NULL;
 }

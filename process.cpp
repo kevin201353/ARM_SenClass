@@ -516,6 +516,9 @@ void *ThreadForSystem(void *para)
         g_pLog->WriteLog(0, "ThreadForSystem, _system !!!!!, command: %s", SystemBuf);
         //system("export DISPLAY=:0.0");
         _system(SystemBuf);
+    }else
+    {
+        g_pLog->WriteLog(0, "ThreadForSystem, p = null");
     }
     pthread_detach(pthread_self());
     return NULL;

@@ -9,11 +9,14 @@
 #include <QString>
 #include "netlink.h"
 static pthread_t g_heartid = NULL;
+static pthread_t g_pingid = NULL;
 extern volatile bool g_bSetupAmq;
 extern void *WhileFun(void *param);
 void MqInit();
 void shenProc();
 static void *HeartNetThread(void *param);
+extern void _kill_spicy_eclass(char *spicy, char *eclass);
+extern char g_szRetVm[1024];
 
 volatile bool   g_bgetserTime = false;
 QString loadFontFromFile(QString path)
@@ -93,15 +96,11 @@ static void *HeartNetThread(void *param)
     {
         if (g_bSetupAmq)
         {
-           //int ret = ping_net(g_strServerIP);
-           //if (ret == 1)
+           if (count >= 6000)
            {
-               if (count >= 6000)
-               {
-                   break;
-               }
-               count++;
+               break;
            }
+           count++;
         }
         usleep(1000);
     }
@@ -109,6 +108,40 @@ static void *HeartNetThread(void *param)
     MqInit();
     system("/opt/spice/bin/start-pa.sh");
     g_bgetserTime = true;
+    pthread_detach(pthread_self());
+    return NULL;
+}
+
+static void *PingNetThread(void *param)
+{
+    while(true)
+    {
+        pid_t pid;
+        if ((pid=vfork()) < 0)
+        {
+            g_pLog->WriteLog(0,"PingNetThread vfork() failed.");
+            return NULL;
+        }else if (pid == 0)
+        {
+            if (execlp("ping", "ping", "-c 1", g_strServerIP, (char*)0) < 0)
+            {
+                g_pLog->WriteLog(0,"PingNetThread execlp() failed.");
+                return NULL;
+            }
+        }
+        int stat;
+        waitpid(pid, &stat, 0);
+        if (stat == 0)
+        {
+            //g_pLog->WriteLog(0,"PingNetThread ping = %s, normal.", g_strServerIP);
+        }else
+        {
+            g_pLog->WriteLog(0,"PingNetThread ping = %s, non_normal.", g_strServerIP);
+            memset(g_szRetVm, 0, sizeof(g_szRetVm));
+            _kill_spicy_eclass("spicy", "eclass_client_udp");
+        }
+        usleep(3000000);
+    }
     pthread_detach(pthread_self());
     return NULL;
 }
@@ -127,6 +160,11 @@ void shenProc()
 #endif
 #if 1
     if(pthread_create(&g_heartid,NULL,HeartNetThread,NULL))
+    {
+    }
+#endif
+#if 0
+    if(pthread_create(&g_pingid,NULL,PingNetThread,NULL))
     {
     }
 #endif
